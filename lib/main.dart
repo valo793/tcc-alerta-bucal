@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/password_screen.dart';
+import 'screens/passwordrecovery_screen.dart';
 import 'screens/webview_screen.dart';
 import 'screens/preferences_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/siteselection_screen.dart';
 import 'services/preferences_model.dart';
 
 void main() {
@@ -25,8 +27,20 @@ class MyApp extends StatelessWidget {
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/password': (context) => const PasswordScreen(),
-        '/webview': (context) => const WebViewScreen(),
         '/preferences': (context) => const PreferencesScreen(),
+        '/site-selection': (context) => const SiteSelectionScreen(),
+        '/passwordrecovery': (context) => const PasswordRecoveryScreen(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/webview') {
+          final args = settings.arguments as String?;
+          if (args != null) {
+            return MaterialPageRoute(
+              builder: (context) => WebViewScreen(initialUrl: args),
+            );
+          }
+        }
+        return null;
       },
     );
   }

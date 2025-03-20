@@ -18,17 +18,22 @@ class WebViewService {
             onPageFinished(url);
           },
           onNavigationRequest: (NavigationRequest request) {
-            // Obtém as preferências diretamente do Provider com listen: true
             final preferences =
                 Provider.of<PreferencesModel>(context, listen: true);
 
-            // Lógica de bloqueio com base nas preferências
             if (preferences.blockYouTube &&
                 request.url.startsWith('https://www.youtube.com/')) {
               return NavigationDecision.prevent;
             }
-            if (preferences.blockTikTok &&
-                request.url.startsWith('https://www.tiktok.com/')) {
+            if (preferences.blockPluto && request.url.contains('pluto.tv')) {
+              return NavigationDecision.prevent;
+            }
+            if (preferences.blockKhan &&
+                request.url.contains('khanacademy.org')) {
+              return NavigationDecision.prevent;
+            }
+            if (preferences.blockEscola &&
+                request.url.contains('escolagames.com.br')) {
               return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;

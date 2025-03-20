@@ -9,34 +9,31 @@ class PasswordScreen extends StatefulWidget {
 }
 
 class _PasswordScreenState extends State<PasswordScreen> {
-  final PasswordService passwordService =
-      PasswordService(); // Instância do serviço
+  final PasswordService passwordService = PasswordService();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  bool isFirstTime = true; // Controla se o usuário já tem senha
+  bool isFirstTime = true;
 
   @override
   void initState() {
     super.initState();
-    _checkPassword(); // Verifica se a senha já foi criada
+    _checkPassword();
   }
 
-  // Função para verificar se há senha armazenada
   Future<void> _checkPassword() async {
     bool hasPassword = await passwordService.hasPassword();
     setState(() {
-      isFirstTime = !hasPassword; // Se não houver senha, é a primeira vez
+      isFirstTime = !hasPassword;
     });
   }
 
-  // Função para criar a senha
   Future<void> _createPassword() async {
     String password = _passwordController.text;
     String confirmPassword = _confirmPasswordController.text;
 
     if (password == confirmPassword) {
-      await passwordService.savePassword(password); // Salva a senha
-      Navigator.pushReplacementNamed(context, '/webview'); // Vai para WebView
+      await passwordService.savePassword(password);
+      Navigator.pushReplacementNamed(context, '/site-selection');
     } else {
       _showErrorDialog('As senhas não correspondem.');
     }
@@ -48,13 +45,12 @@ class _PasswordScreenState extends State<PasswordScreen> {
     bool isValid = await passwordService.validatePassword(password);
 
     if (isValid) {
-      Navigator.pushReplacementNamed(context, '/webview'); // Vai para WebView
+      Navigator.pushReplacementNamed(context, '/site-selection');
     } else {
       _showErrorDialog('Senha incorreta.');
     }
   }
 
-  // Exibe um alerta em caso de erro
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -109,6 +105,12 @@ class _PasswordScreenState extends State<PasswordScreen> {
               ElevatedButton(
                 onPressed: _authenticatePassword,
                 child: const Text('Autenticar'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, '/passwordrecovery');
+                },
+                child: const Text('Esqueceu a senha?'),
               ),
             ],
           ],

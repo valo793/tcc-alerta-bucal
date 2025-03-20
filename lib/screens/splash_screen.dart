@@ -11,7 +11,6 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Após 3 segundos, navega para a tela inicial
     Future.delayed(const Duration(seconds: 3), () {
       Navigator.pushReplacementNamed(context, '/password');
     });
@@ -25,7 +24,6 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Exibe a logo
             Image.asset('assets/logo.png', width: 150, height: 150),
             const SizedBox(height: 20),
             const Text(

@@ -1,2 +1,6 @@
 -dontwarn com.google.**
 -dontwarn javax.annotation.**
+-keep class org.tensorflow.** { *; }
+-keep class com.google.** { *; }
+-dontwarn org.tensorflow.lite.**
+-dontwarn com.google.**

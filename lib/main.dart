@@ -1,3 +1,4 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/password_screen.dart';
@@ -8,17 +9,24 @@ import 'screens/splash_screen.dart';
 import 'screens/siteselection_screen.dart';
 import 'services/preferences_model.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final cameras = await availableCameras(); // Obtém as câmeras
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => PreferencesModel(),
-      child: const MyApp(),
+      child: MyApp(cameras: cameras), // Passa as câmeras para o app
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final List<CameraDescription> cameras;
+
+  const MyApp({super.key, required this.cameras});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -28,7 +36,7 @@ class MyApp extends StatelessWidget {
         '/splash': (context) => const SplashScreen(),
         '/password': (context) => const PasswordScreen(),
         '/preferences': (context) => const PreferencesScreen(),
-        '/site-selection': (context) => const SiteSelectionScreen(),
+        '/site-selection': (context) => SiteSelectionScreen(cameras: cameras),
         '/passwordrecovery': (context) => const PasswordRecoveryScreen(),
       },
       onGenerateRoute: (settings) {
@@ -36,7 +44,8 @@ class MyApp extends StatelessWidget {
           final args = settings.arguments as String?;
           if (args != null) {
             return MaterialPageRoute(
-              builder: (context) => WebViewScreen(initialUrl: args),
+              builder: (context) =>
+                  WebViewScreen(initialUrl: args, cameras: cameras),
             );
           }
         }

@@ -3,9 +3,12 @@ import 'package:provider/provider.dart';
 import '../services/password_service.dart';
 import '../services/preferences_model.dart';
 import 'webview_screen.dart';
+import 'package:camera/camera.dart';
 
 class SiteSelectionScreen extends StatefulWidget {
-  const SiteSelectionScreen({super.key});
+  final List<CameraDescription> cameras;
+
+  const SiteSelectionScreen({super.key, required this.cameras});
 
   @override
   State<SiteSelectionScreen> createState() => _SiteSelectionScreenState();
@@ -27,7 +30,8 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => WebViewScreen(initialUrl: url),
+          builder: (context) =>
+              WebViewScreen(initialUrl: url, cameras: widget.cameras),
         ),
       );
     }

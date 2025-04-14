@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -11,8 +12,11 @@ class WebViewScreen extends StatefulWidget {
   final String initialUrl;
   final List<CameraDescription> cameras;
 
-  const WebViewScreen(
-      {super.key, required this.initialUrl, required this.cameras});
+  const WebViewScreen({
+    super.key,
+    required this.initialUrl,
+    required this.cameras,
+  });
 
   @override
   State<WebViewScreen> createState() => _WebViewScreenState();
@@ -20,20 +24,19 @@ class WebViewScreen extends StatefulWidget {
 
 class _WebViewScreenState extends State<WebViewScreen> {
   late final WebViewService webViewService;
-  bool isLoading = true;
-
   CameraController? _cameraController;
   XFile? _capturedImage;
   tfl.Interpreter? _interpreter;
-  String _result = "Capturando imagem...";
   bool _isLoadingAI = false;
+  bool isLoading = true;
+  String _result = "Capturando imagem...";
 
   @override
   void initState() {
     super.initState();
     webViewService = WebViewService(
       context: context,
-      onPageFinished: _handlePageFinished,
+      onPageFinished: (_) => setState(() => isLoading = false),
     );
     webViewService.loadUrl(widget.initialUrl);
     _initializeCamera();
@@ -53,13 +56,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
         (camera) => camera.lensDirection == CameraLensDirection.front,
         orElse: () => widget.cameras.first,
       );
-
       _cameraController = CameraController(
         frontCamera,
         ResolutionPreset.medium,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
-
       await _cameraController?.initialize();
       _startImageCaptureLoop();
     } catch (e) {
@@ -70,8 +71,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
   Future<void> _loadModel() async {
     try {
       final options = tfl.InterpreterOptions();
-      _interpreter = await tfl.Interpreter.fromAsset('assets/modelo.tflite',
-          options: options);
+      _interpreter = await tfl.Interpreter.fromAsset(
+        'assets/modelo.tflite',
+        options: options,
+      );
     } catch (e) {
       setState(() => _result = "Erro ao carregar modelo");
     }
@@ -79,14 +82,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   Future<void> _startImageCaptureLoop() async {
     while (mounted) {
-      await _captureImage();
+      await _captureAndAnalyzeImage();
       await Future.delayed(const Duration(seconds: 10));
     }
   }
 
-  Future<void> _captureImage() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized)
-      return;
+  Future<void> _captureAndAnalyzeImage() async {
+    if (!(_cameraController?.value.isInitialized ?? false)) return;
+
     try {
       final image = await _cameraController!.takePicture();
       setState(() {
@@ -94,72 +97,61 @@ class _WebViewScreenState extends State<WebViewScreen> {
         _result = "Analisando...";
         _isLoadingAI = true;
       });
-      await _analyzeImage();
-      setState(() => _isLoadingAI = false);
-    } catch (e) {
-      debugPrint('Erro ao capturar imagem: $e');
-    }
-  }
 
-  Future<void> _analyzeImage() async {
-    if (_interpreter == null || _capturedImage == null) {
-      setState(() => _result = "Erro ao processar imagem");
-      return;
-    }
+      final imageBytes = await File(image.path).readAsBytes();
 
-    try {
-      final imageBytes = await File(_capturedImage!.path).readAsBytes();
-      final image = img.decodeImage(imageBytes);
-      if (image == null) {
-        setState(() => _result = "Erro ao decodificar imagem");
-        return;
-      }
-
-      final resizedImage = img.copyResize(image, width: 640, height: 640);
-
-      var input = List.generate(
-          1,
-          (_) => List.generate(
-              640, (_) => List.generate(640, (_) => List.filled(3, 0.0))));
-      for (int y = 0; y < 640; y++) {
-        for (int x = 0; x < 640; x++) {
-          final pixel = resizedImage.getPixel(x, y);
-          input[0][y][x][0] = pixel.r / 255.0;
-          input[0][y][x][1] = pixel.g / 255.0;
-          input[0][y][x][2] = pixel.b / 255.0;
-        }
-      }
-
-      var output = List.generate(
-          1, (_) => List.generate(5, (_) => List.filled(8400, 0.0)));
-      _interpreter!.run(input, output);
-
-      final double confidence = processDetections(output);
-      const double threshold = 0.8;
+      final isolateResult = await compute(_processImage, {
+        'bytes': imageBytes,
+        'modelAddress': _interpreter!.address,
+      });
 
       setState(() {
-        _result = confidence >= threshold
-            ? "Chupeta detectada!\nChance: ${(confidence * 100).toStringAsFixed(1)}%"
-            : "Nenhuma chupeta encontrada\nChance: ${(confidence * 100).toStringAsFixed(1)}%";
+        _result = isolateResult >= 0.8
+            ? "Chupeta detectada!\nChance: ${(isolateResult * 100).toStringAsFixed(1)}%"
+            : "Nenhuma chupeta encontrada\nChance: ${(isolateResult * 100).toStringAsFixed(1)}%";
+        _isLoadingAI = false;
       });
     } catch (e) {
-      setState(() => _result = "Erro: $e");
+      debugPrint('Erro: $e');
+      setState(() {
+        _result = "Erro ao processar imagem";
+        _isLoadingAI = false;
+      });
     }
   }
 
-  double processDetections(List output) {
+  static double _processImage(Map args) {
+    final Uint8List bytes = args['bytes'];
+    final int modelAddress = args['modelAddress'];
+    final interpreter = tfl.Interpreter.fromAddress(modelAddress);
+    final decoded = img.decodeImage(Uint8List.fromList(bytes));
+    if (decoded == null) return 0.0;
+
+    final resized = img.copyResize(decoded, width: 640, height: 640);
+
+    final input = List.generate(
+        1,
+        (_) => List.generate(
+            640,
+            (y) => List.generate(640, (x) {
+                  final pixel = resized.getPixel(x, y);
+                  return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
+                })));
+
+    final output = List.generate(
+      1,
+      (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
+    );
+
+    interpreter.run(input, output);
+
     double maxConfidence = 0.0;
-    for (var i = 0; i < output[0][0].length; i++) {
-      double confidence = output[0][4][i];
-      if (confidence > maxConfidence) {
-        maxConfidence = confidence;
-      }
+    for (int i = 0; i < output[0][0].length; i++) {
+      maxConfidence =
+          output[0][4][i] > maxConfidence ? output[0][4][i] : maxConfidence;
     }
-    return maxConfidence;
-  }
 
-  void _handlePageFinished(String url) {
-    setState(() => isLoading = false);
+    return maxConfidence;
   }
 
   @override

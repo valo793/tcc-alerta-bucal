@@ -25,11 +25,10 @@ class WebViewScreen extends StatefulWidget {
 class _WebViewScreenState extends State<WebViewScreen> {
   late final WebViewService webViewService;
   CameraController? _cameraController;
-  XFile? _capturedImage;
   tfl.Interpreter? _interpreter;
-  bool _isLoadingAI = false;
   bool isLoading = true;
-  String _result = "Capturando imagem...";
+  bool isPopupOpen = false;
+  bool isCheckingPopup = false;
 
   @override
   void initState() {
@@ -76,7 +75,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         options: options,
       );
     } catch (e) {
-      setState(() => _result = "Erro ao carregar modelo");
+      debugPrint('Erro ao carregar modelo: $e');
     }
   }
 
@@ -92,31 +91,20 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
     try {
       final image = await _cameraController!.takePicture();
-      setState(() {
-        _capturedImage = image;
-        _result = "Analisando...";
-        _isLoadingAI = true;
-      });
-
       final imageBytes = await File(image.path).readAsBytes();
 
-      final isolateResult = await compute(_processImage, {
+      final confidence = await compute(_processImage, {
         'bytes': imageBytes,
         'modelAddress': _interpreter!.address,
       });
 
-      setState(() {
-        _result = isolateResult >= 0.8
-            ? "Chupeta detectada!\nChance: ${(isolateResult * 100).toStringAsFixed(1)}%"
-            : "Nenhuma chupeta encontrada\nChance: ${(isolateResult * 100).toStringAsFixed(1)}%";
-        _isLoadingAI = false;
-      });
+      if (confidence >= 0.8) {
+        _showPacifierPopup();
+      } else {
+        _closePacifierPopup();
+      }
     } catch (e) {
-      debugPrint('Erro: $e');
-      setState(() {
-        _result = "Erro ao processar imagem";
-        _isLoadingAI = false;
-      });
+      debugPrint('Erro ao processar imagem: $e');
     }
   }
 
@@ -130,13 +118,15 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final resized = img.copyResize(decoded, width: 640, height: 640);
 
     final input = List.generate(
-        1,
-        (_) => List.generate(
-            640,
-            (y) => List.generate(640, (x) {
-                  final pixel = resized.getPixel(x, y);
-                  return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
-                })));
+      1,
+      (_) => List.generate(
+        640,
+        (y) => List.generate(640, (x) {
+          final pixel = resized.getPixel(x, y);
+          return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
+        }),
+      ),
+    );
 
     final output = List.generate(
       1,
@@ -154,6 +144,35 @@ class _WebViewScreenState extends State<WebViewScreen> {
     return maxConfidence;
   }
 
+  void _showPacifierPopup() {
+    if (!isPopupOpen && !isCheckingPopup) {
+      isPopupOpen = true;
+      isCheckingPopup = true;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Atenção!'),
+            content: const Text('Por favor, retire a chupeta da boca.'),
+          );
+        },
+      ).then((_) {
+        isPopupOpen = false;
+        isCheckingPopup = false;
+      });
+    }
+  }
+
+  void _closePacifierPopup() {
+    if (isPopupOpen && isCheckingPopup) {
+      Navigator.of(context, rootNavigator: true).pop();
+      isPopupOpen = false;
+      isCheckingPopup = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -162,29 +181,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
         children: [
           WebViewWidget(controller: webViewService.controller),
           if (isLoading) const Center(child: CircularProgressIndicator()),
-          if (_capturedImage != null)
-            Positioned(
-              bottom: 20,
-              right: 20,
-              child: Image.file(
-                File(_capturedImage!.path),
-                width: 100,
-                height: 150,
-                fit: BoxFit.cover,
-              ),
-            ),
-          Positioned(
-            bottom: 10,
-            left: 10,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              color: Colors.black54,
-              child: Text(
-                _isLoadingAI ? "Analisando..." : _result,
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
         ],
       ),
     );

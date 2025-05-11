@@ -22,17 +22,20 @@ class WebViewScreen extends StatefulWidget {
   State<WebViewScreen> createState() => _WebViewScreenState();
 }
 
-class _WebViewScreenState extends State<WebViewScreen> {
+class _WebViewScreenState extends State<WebViewScreen>
+    with WidgetsBindingObserver {
   late final WebViewService webViewService;
   CameraController? _cameraController;
   tfl.Interpreter? _interpreter;
   bool isLoading = true;
   bool isPopupOpen = false;
-  bool isCheckingPopup = false;
+  bool isAppActive = true;
+  Timer? _captureTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     webViewService = WebViewService(
       context: context,
       onPageFinished: (_) => setState(() => isLoading = false),
@@ -43,7 +46,20 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    isAppActive = state == AppLifecycleState.resumed;
+    if (isAppActive) {
+      _startImageCaptureLoop();
+    } else {
+      _captureTimer?.cancel();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _captureTimer?.cancel();
     _cameraController?.dispose();
     _interpreter?.close();
     super.dispose();
@@ -57,11 +73,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
       );
       _cameraController = CameraController(
         frontCamera,
-        ResolutionPreset.medium,
+        ResolutionPreset.low,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
       await _cameraController?.initialize();
-      _startImageCaptureLoop();
+      if (mounted && isAppActive) {
+        _startImageCaptureLoop();
+      }
     } catch (e) {
       debugPrint('Erro ao inicializar a câmera: $e');
     }
@@ -79,11 +97,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
     }
   }
 
-  Future<void> _startImageCaptureLoop() async {
-    while (mounted) {
+  void _startImageCaptureLoop() {
+    _captureTimer?.cancel();
+    _captureTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+      if (!mounted || !isAppActive) return;
       await _captureAndAnalyzeImage();
-      await Future.delayed(const Duration(seconds: 10));
-    }
+    });
   }
 
   Future<void> _captureAndAnalyzeImage() async {
@@ -145,10 +164,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _showPacifierPopup() {
-    if (!isPopupOpen && !isCheckingPopup) {
+    if (!isPopupOpen) {
       isPopupOpen = true;
-      isCheckingPopup = true;
-
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -158,30 +175,60 @@ class _WebViewScreenState extends State<WebViewScreen> {
             content: const Text('Por favor, retire a chupeta da boca.'),
           );
         },
-      ).then((_) {
-        isPopupOpen = false;
-        isCheckingPopup = false;
-      });
+      );
     }
   }
 
   void _closePacifierPopup() {
-    if (isPopupOpen && isCheckingPopup) {
+    if (isPopupOpen) {
       Navigator.of(context, rootNavigator: true).pop();
       isPopupOpen = false;
-      isCheckingPopup = false;
+    }
+  }
+
+  Color _getAppBarColor() {
+    final url = widget.initialUrl.toLowerCase();
+    if (url.contains('youtube')) {
+      return Colors.red;
+    } else if (url.contains('pluto.tv')) {
+      return Colors.black;
+    } else if (url.contains('khanacademy')) {
+      return Colors.green;
+    } else if (url.contains('escolagames')) {
+      return Colors.orange;
+    } else {
+      return Theme.of(context).primaryColor;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Navegador Web e IA')),
-      body: Stack(
-        children: [
-          WebViewWidget(controller: webViewService.controller),
-          if (isLoading) const Center(child: CircularProgressIndicator()),
-        ],
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Navegador Web',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: _getAppBarColor(),
+        ),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              WebViewWidget(controller: webViewService.controller),
+              if (isLoading)
+                const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

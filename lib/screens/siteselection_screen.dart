@@ -16,51 +16,75 @@ class SiteSelectionScreen extends StatefulWidget {
 }
 
 class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
-  final PasswordService _passwordService = PasswordService();
+  bool _isLoadingPreferences = true;
+  bool _isNavigating = false;
+  PasswordService? _passwordService;
+
+  static const _blockedDomains = {
+    'youtube': 'blockYouTube',
+    'pluto': 'blockPluto',
+    'khan': 'blockKhan',
+    'escolagames': 'blockEscola',
+  };
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    Provider.of<PreferencesModel>(context, listen: false).reloadPreferences();
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final preferences = Provider.of<PreferencesModel>(context, listen: false);
+    await preferences.reloadPreferences();
+    setState(() {
+      _isLoadingPreferences = false;
+    });
   }
 
   Future<void> navigateToWebView(String url) async {
-    bool isBlocked = await _checkIfBlocked(url);
-    if (!isBlocked) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              WebViewScreen(initialUrl: url, cameras: widget.cameras),
-        ),
-      );
+    if (_isNavigating) return;
+    _isNavigating = true;
+
+    try {
+      final preferences = Provider.of<PreferencesModel>(context, listen: false);
+      bool isBlocked = _checkIfBlocked(url, preferences);
+      if (!isBlocked) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                WebViewScreen(initialUrl: url, cameras: widget.cameras),
+          ),
+        );
+      } else {
+        await _showBlockedDialog();
+      }
+    } finally {
+      _isNavigating = false;
     }
   }
 
-  Future<bool> _checkIfBlocked(String url) async {
-    final preferences = Provider.of<PreferencesModel>(context, listen: false);
-    bool isBlocked = (url.contains('youtube') && preferences.blockYouTube) ||
-        (url.contains('pluto') && preferences.blockPluto) ||
-        (url.contains('khan') && preferences.blockKhan) ||
-        (url.contains('escolagames') && preferences.blockEscola);
-
-    if (isBlocked) {
-      _showBlockedDialog();
+  bool _checkIfBlocked(String url, PreferencesModel preferences) {
+    for (var entry in _blockedDomains.entries) {
+      if (url.contains(entry.key)) {
+        return preferences.getProperty(entry.value) as bool;
+      }
     }
-    return isBlocked;
+    return false;
   }
 
   Future<void> _showBlockedDialog() async {
-    showDialog(
+    return showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Acesso Bloqueado'),
         content:
             const Text('Este site está bloqueado pelas suas preferências.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: const Text('OK', style: TextStyle(color: Colors.blue)),
           ),
         ],
       ),
@@ -68,35 +92,47 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
   }
 
   Future<void> _showPasswordDialog() async {
+    _passwordService ??= PasswordService();
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Autenticação'),
-          content: const Text(
-              'Toque no sensor de impressão digital para acessar as preferências.'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.fingerprint, size: 48, color: Colors.blue),
+              SizedBox(height: 16),
+              Text(
+                'Toque no sensor de impressão digital para acessar as preferências.',
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
           actions: <Widget>[
             TextButton(
-              child: const Text('Cancelar'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              child:
+                  const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+              onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: const Text('Confirmar'),
+              child:
+                  const Text('Confirmar', style: TextStyle(color: Colors.blue)),
               onPressed: () async {
                 bool isValid =
-                    await _passwordService.authenticateWithFingerprint();
-                if (!mounted) return;
+                    await _passwordService!.authenticateWithFingerprint();
                 Navigator.of(context).pop();
                 if (isValid) {
                   Navigator.pushNamed(context, '/preferences');
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content:
-                          Text('Falha na autenticação por impressão digital.'),
+                      content: Text('Falha na autenticação.'),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 2),
                     ),
                   );
                 }
@@ -110,51 +146,137 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Selecione um site!'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Sobre o app',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AboutAppScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _showPasswordDialog,
-          ),
-        ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: () => navigateToWebView('https://www.youtube.com'),
-              child: const Text('YouTube'),
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Selecione um Site'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.info_outline),
+              tooltip: 'Sobre o app',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const AboutAppScreen()),
+                );
+              },
             ),
-            ElevatedButton(
-              onPressed: () => navigateToWebView(
-                  'https://pluto.tv/br/live-tv/6479ff764f5ba5000878dfe2'),
-              child: const Text('Pluto Tv'),
-            ),
-            ElevatedButton(
-              onPressed: () => navigateToWebView('https://pt.khanacademy.org'),
-              child: const Text('Khan Academy'),
-            ),
-            ElevatedButton(
-              onPressed: () =>
-                  navigateToWebView('https://www.escolagames.com.br'),
-              child: const Text('Escola Games'),
+            IconButton(
+              icon: const Icon(Icons.settings),
+              tooltip: 'Configurações',
+              onPressed: _showPasswordDialog,
             ),
           ],
         ),
+        body: SafeArea(
+          child: _isLoadingPreferences
+              ? const Center(child: CircularProgressIndicator())
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: ListView(
+                        children: [
+                          const Text(
+                            'Escolha um site para acessar:',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          _buildSiteButton(
+                            context,
+                            title: 'YouTube',
+                            icon: Icons.video_library,
+                            url: 'https://m.youtube.com/?vq=medium',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildSiteButton(
+                            context,
+                            title: 'Pluto TV',
+                            icon: Icons.live_tv,
+                            url:
+                                'https://pluto.tv/br/live-tv/6479ff764f5ba500087ascan:play',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildSiteButton(
+                            context,
+                            title: 'Khan Academy',
+                            icon: Icons.school,
+                            url: 'https://pt.khanacademy.org',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildSiteButton(
+                            context,
+                            title: 'Escola Games',
+                            icon: Icons.games,
+                            url: 'https://www.escolagames.com.br',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+        ),
       ),
     );
+  }
+
+  Widget _buildSiteButton(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required String url,
+  }) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => navigateToWebView(url),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Icon(icon, size: 24, color: Colors.blue),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+extension PreferencesModelExtension on PreferencesModel {
+  dynamic getProperty(String property) {
+    switch (property) {
+      case 'blockYouTube':
+        return blockYouTube;
+      case 'blockPluto':
+        return blockPluto;
+      case 'blockKhan':
+        return blockKhan;
+      case 'blockEscola':
+        return blockEscola;
+      default:
+        return false;
+    }
   }
 }

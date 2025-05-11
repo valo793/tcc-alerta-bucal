@@ -2,7 +2,6 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/password_screen.dart';
-import 'screens/aboutApp_screen.dart';
 import 'screens/webview_screen.dart';
 import 'screens/preferences_screen.dart';
 import 'screens/splash_screen.dart';

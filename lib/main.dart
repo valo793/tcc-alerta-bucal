@@ -2,7 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/password_screen.dart';
-import 'screens/passwordrecovery_screen.dart';
+import 'screens/aboutApp_screen.dart';
 import 'screens/webview_screen.dart';
 import 'screens/preferences_screen.dart';
 import 'screens/splash_screen.dart';
@@ -12,12 +12,12 @@ import 'services/preferences_model.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final cameras = await availableCameras(); // Obtém as câmeras
+  final cameras = await availableCameras();
 
   runApp(
     ChangeNotifierProvider(
       create: (_) => PreferencesModel(),
-      child: MyApp(cameras: cameras), // Passa as câmeras para o app
+      child: MyApp(cameras: cameras),
     ),
   );
 }
@@ -37,7 +37,6 @@ class MyApp extends StatelessWidget {
         '/password': (context) => const PasswordScreen(),
         '/preferences': (context) => const PreferencesScreen(),
         '/site-selection': (context) => SiteSelectionScreen(cameras: cameras),
-        '/passwordrecovery': (context) => const PasswordRecoveryScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/webview') {

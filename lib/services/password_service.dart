@@ -1,21 +1,33 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:local_auth/local_auth.dart';
 
 class PasswordService {
-  static const String _passwordKey = 'user_password';
+  final LocalAuthentication _auth = LocalAuthentication();
 
-  Future<bool> hasPassword() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.containsKey(_passwordKey);
+  Future<bool> isFingerprintAvailable() async {
+    final canCheck = await _auth.canCheckBiometrics;
+    final isSupported = await _auth.isDeviceSupported();
+    final biometrics = await _auth.getAvailableBiometrics();
+
+    print('Biometrias disponíveis: $biometrics');
+    return canCheck &&
+            isSupported &&
+            biometrics.contains(BiometricType.fingerprint) ||
+        biometrics.contains(BiometricType.strong);
   }
 
-  Future<void> savePassword(String password) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_passwordKey, password);
-  }
-
-  Future<bool> validatePassword(String inputPassword) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? savedPassword = prefs.getString(_passwordKey);
-    return savedPassword == inputPassword;
+  Future<bool> authenticateWithFingerprint() async {
+    try {
+      return await _auth.authenticate(
+        localizedReason: 'Toque o sensor para autenticar com sua digital',
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+          useErrorDialogs: true,
+        ),
+      );
+    } catch (e) {
+      print('Erro na autenticação: $e');
+      return false;
+    }
   }
 }

@@ -10,111 +10,72 @@ class PasswordScreen extends StatefulWidget {
 
 class _PasswordScreenState extends State<PasswordScreen> {
   final PasswordService passwordService = PasswordService();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  bool isFirstTime = true;
+  bool canUseBiometrics = false;
+  bool isAuthenticating = false;
 
   @override
   void initState() {
     super.initState();
-    _checkPassword();
+    _checkBiometricAvailability();
   }
 
-  Future<void> _checkPassword() async {
-    bool hasPassword = await passwordService.hasPassword();
+  Future<void> _checkBiometricAvailability() async {
+    bool available = await passwordService.isFingerprintAvailable();
     setState(() {
-      isFirstTime = !hasPassword;
+      canUseBiometrics = available;
     });
   }
 
-  Future<void> _createPassword() async {
-    String password = _passwordController.text;
-    String confirmPassword = _confirmPasswordController.text;
+  Future<void> _authenticateBiometric() async {
+    setState(() {
+      isAuthenticating = true;
+    });
 
-    if (password == confirmPassword) {
-      await passwordService.savePassword(password);
-      Navigator.pushReplacementNamed(context, '/site-selection');
-    } else {
-      _showErrorDialog('As senhas não correspondem.');
-    }
-  }
+    final isValid = await passwordService.authenticateWithFingerprint();
 
-  // Função para autenticar a senha
-  Future<void> _authenticatePassword() async {
-    String password = _passwordController.text;
-    bool isValid = await passwordService.validatePassword(password);
+    if (!mounted) return;
+
+    setState(() {
+      isAuthenticating = false;
+    });
 
     if (isValid) {
       Navigator.pushReplacementNamed(context, '/site-selection');
     } else {
-      _showErrorDialog('Senha incorreta.');
+      _showErrorDialog('Falha na autenticação por impressão digital.');
     }
   }
 
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Erro'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
+      builder: (_) => AlertDialog(
+        title: const Text('Erro'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          )
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Autenticação de Senha')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            if (isFirstTime) ...[
-              TextField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Crie uma senha'),
-                obscureText: true,
-              ),
-              TextField(
-                controller: _confirmPasswordController,
-                decoration:
-                    const InputDecoration(labelText: 'Confirme a senha'),
-                obscureText: true,
-              ),
-              ElevatedButton(
-                onPressed: _createPassword,
-                child: const Text('Criar Senha'),
-              ),
-            ] else ...[
-              TextField(
-                controller: _passwordController,
-                decoration:
-                    const InputDecoration(labelText: 'Digite sua senha'),
-                obscureText: true,
-              ),
-              ElevatedButton(
-                onPressed: _authenticatePassword,
-                child: const Text('Autenticar'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacementNamed(context, '/passwordrecovery');
-                },
-                child: const Text('Esqueceu a senha?'),
-              ),
-            ],
-          ],
-        ),
+      appBar: AppBar(title: const Text('Autenticação')),
+      body: Center(
+        child: canUseBiometrics
+            ? isAuthenticating
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _authenticateBiometric,
+                    child: const Text('Autenticar com digital'),
+                  )
+            : const Text(
+                'Impressão digital não disponível ou não configurada.'),
       ),
     );
   }

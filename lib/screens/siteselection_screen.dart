@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/password_service.dart';
 import '../services/preferences_model.dart';
+import 'aboutApp_screen.dart';
 import 'webview_screen.dart';
 import 'package:camera/camera.dart';
 
@@ -15,7 +16,6 @@ class SiteSelectionScreen extends StatefulWidget {
 }
 
 class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
-  final _passwordController = TextEditingController();
   final PasswordService _passwordService = PasswordService();
 
   @override
@@ -73,20 +73,9 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Insira sua senha'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
-                const Text(
-                    'Por favor, insira sua senha para acessar as preferências.'),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Senha'),
-                ),
-              ],
-            ),
-          ),
+          title: const Text('Autenticação'),
+          content: const Text(
+              'Toque no sensor de impressão digital para acessar as preferências.'),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancelar'),
@@ -97,16 +86,18 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
             TextButton(
               child: const Text('Confirmar'),
               onPressed: () async {
-                bool isValid = await _passwordService
-                    .validatePassword(_passwordController.text);
+                bool isValid =
+                    await _passwordService.authenticateWithFingerprint();
+                if (!mounted) return;
+                Navigator.of(context).pop();
                 if (isValid) {
-                  _passwordController.clear();
-                  Navigator.of(context).pop();
                   Navigator.pushNamed(context, '/preferences');
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Senha incorreta. Tente novamente.')),
+                      content:
+                          Text('Falha na autenticação por impressão digital.'),
+                    ),
                   );
                 }
               },
@@ -123,6 +114,16 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
       appBar: AppBar(
         title: const Text('Selecione um site!'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'Sobre o app',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AboutAppScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: _showPasswordDialog,

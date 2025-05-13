@@ -32,6 +32,9 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool isAppActive = true;
   Timer? _captureTimer;
 
+  final int _normalInterval = 15;
+  final int _popupInterval = 5;
+
   @override
   void initState() {
     super.initState();
@@ -50,7 +53,7 @@ class _WebViewScreenState extends State<WebViewScreen>
     super.didChangeAppLifecycleState(state);
     isAppActive = state == AppLifecycleState.resumed;
     if (isAppActive) {
-      _startImageCaptureLoop();
+      _startImageCaptureLoop(intervalSeconds: _normalInterval);
     } else {
       _captureTimer?.cancel();
     }
@@ -78,7 +81,7 @@ class _WebViewScreenState extends State<WebViewScreen>
       );
       await _cameraController?.initialize();
       if (mounted && isAppActive) {
-        _startImageCaptureLoop();
+        _startImageCaptureLoop(intervalSeconds: _normalInterval);
       }
     } catch (e) {
       debugPrint('Erro ao inicializar a câmera: $e');
@@ -97,9 +100,10 @@ class _WebViewScreenState extends State<WebViewScreen>
     }
   }
 
-  void _startImageCaptureLoop() {
+  void _startImageCaptureLoop({int intervalSeconds = 15}) {
     _captureTimer?.cancel();
-    _captureTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+    _captureTimer =
+        Timer.periodic(Duration(seconds: intervalSeconds), (timer) async {
       if (!mounted || !isAppActive) return;
       await _captureAndAnalyzeImage();
     });
@@ -166,6 +170,10 @@ class _WebViewScreenState extends State<WebViewScreen>
   void _showPacifierPopup() {
     if (!isPopupOpen) {
       isPopupOpen = true;
+      _captureTimer?.cancel();
+      _startImageCaptureLoop(intervalSeconds: _popupInterval);
+      webViewService.controller.setJavaScriptMode(JavaScriptMode.disabled);
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -183,6 +191,9 @@ class _WebViewScreenState extends State<WebViewScreen>
     if (isPopupOpen) {
       Navigator.of(context, rootNavigator: true).pop();
       isPopupOpen = false;
+      _captureTimer?.cancel();
+      _startImageCaptureLoop(intervalSeconds: _normalInterval);
+      webViewService.controller.setJavaScriptMode(JavaScriptMode.unrestricted);
     }
   }
 

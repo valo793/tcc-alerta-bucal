@@ -64,18 +64,65 @@ class _PasswordScreenState extends State<PasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Autenticação')),
-      body: Center(
-        child: canUseBiometrics
-            ? isAuthenticating
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: _authenticateBiometric,
-                    child: const Text('Autenticar com digital'),
-                  )
-            : const Text(
-                'Impressão digital não disponível ou não configurada.'),
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Autenticação',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: Colors.blue,
+        ),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: canUseBiometrics
+                    ? isAuthenticating
+                        ? const CircularProgressIndicator(
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.blue),
+                          )
+                        : ElevatedButton(
+                            onPressed: _authenticateBiometric,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Autenticar com digital',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                    : const Text(
+                        'Impressão digital não disponível ou não configurada.',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

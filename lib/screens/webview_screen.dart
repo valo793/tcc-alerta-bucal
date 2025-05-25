@@ -7,15 +7,18 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
 import 'package:image/image.dart' as img;
 import '../services/web_services.dart';
+import 'pacifierWarning_screen.dart';
 
 class WebViewScreen extends StatefulWidget {
   final String initialUrl;
-  final List<CameraDescription> cameras;
+  final CameraController cameraController;
+  final tfl.Interpreter interpreter;
 
   const WebViewScreen({
     super.key,
     required this.initialUrl,
-    required this.cameras,
+    required this.cameraController,
+    required this.interpreter,
   });
 
   @override
@@ -24,11 +27,9 @@ class WebViewScreen extends StatefulWidget {
 
 class _WebViewScreenState extends State<WebViewScreen> {
   late final WebViewService webViewService;
-  CameraController? _cameraController;
-  tfl.Interpreter? _interpreter;
+  bool _isCapturing = true;
   bool isLoading = true;
   bool isPopupOpen = false;
-  bool isCheckingPopup = false;
 
   @override
   void initState() {
@@ -38,73 +39,53 @@ class _WebViewScreenState extends State<WebViewScreen> {
       onPageFinished: (_) => setState(() => isLoading = false),
     );
     webViewService.loadUrl(widget.initialUrl);
-    _initializeCamera();
-    _loadModel();
+    if (widget.cameraController.value.isInitialized) {
+      _startImageCaptureLoop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro: Câmera não inicializada.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
-    _cameraController?.dispose();
-    _interpreter?.close();
+    _isCapturing = false;
     super.dispose();
   }
 
-  Future<void> _initializeCamera() async {
-    try {
-      final frontCamera = widget.cameras.firstWhere(
-        (camera) => camera.lensDirection == CameraLensDirection.front,
-        orElse: () => widget.cameras.first,
-      );
-      _cameraController = CameraController(
-        frontCamera,
-        ResolutionPreset.medium,
-        imageFormatGroup: ImageFormatGroup.jpeg,
-      );
-      await _cameraController?.initialize();
-      _startImageCaptureLoop();
-    } catch (e) {
-      debugPrint('Erro ao inicializar a câmera: $e');
-    }
-  }
-
-  Future<void> _loadModel() async {
-    try {
-      final options = tfl.InterpreterOptions();
-      _interpreter = await tfl.Interpreter.fromAsset(
-        'assets/modelo.tflite',
-        options: options,
-      );
-    } catch (e) {
-      debugPrint('Erro ao carregar modelo: $e');
-    }
-  }
-
   Future<void> _startImageCaptureLoop() async {
-    while (mounted) {
+    while (mounted && _isCapturing) {
       await _captureAndAnalyzeImage();
       await Future.delayed(const Duration(seconds: 10));
     }
   }
 
   Future<void> _captureAndAnalyzeImage() async {
-    if (!(_cameraController?.value.isInitialized ?? false)) return;
+    if (!_isCapturing || !widget.cameraController.value.isInitialized) return;
 
     try {
-      final image = await _cameraController!.takePicture();
+      final image = await widget.cameraController.takePicture();
       final imageBytes = await File(image.path).readAsBytes();
 
       final confidence = await compute(_processImage, {
         'bytes': imageBytes,
-        'modelAddress': _interpreter!.address,
+        'modelAddress': widget.interpreter.address,
       });
 
       if (confidence >= 0.8) {
         _showPacifierPopup();
-      } else {
-        _closePacifierPopup();
       }
     } catch (e) {
-      debugPrint('Erro ao processar imagem: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao processar imagem: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -145,31 +126,82 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _showPacifierPopup() {
-    if (!isPopupOpen && !isCheckingPopup) {
+    if (!isPopupOpen) {
       isPopupOpen = true;
-      isCheckingPopup = true;
+      _isCapturing = false;
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Atenção!'),
-            content: const Text('Por favor, retire a chupeta da boca.'),
-          );
-        },
-      ).then((_) {
-        isPopupOpen = false;
-        isCheckingPopup = false;
+      webViewService.controller.runJavaScript('''
+        function pauseYouTubeVideos() {
+          var iframes = document.getElementsByTagName('iframe');
+          for (var i = 0; i < iframes.length; i++) {
+            var iframe = iframes[i];
+            if (iframe.src.includes('youtube.com')) {
+              iframe.contentWindow.postMessage(
+                '{"event":"command","func":"pauseVideo","args":""}',
+                '*'
+              );
+            }
+          }
+          var videos = document.getElementsByTagName('video');
+          for (var i = 0; i < videos.length; i++) {
+            videos[i].pause();
+          }
+          console.log('Vídeos pausados');
+        }
+        pauseYouTubeVideos();
+      ''').catchError((e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao pausar vídeo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       });
-    }
-  }
 
-  void _closePacifierPopup() {
-    if (isPopupOpen && isCheckingPopup) {
-      Navigator.of(context, rootNavigator: true).pop();
-      isPopupOpen = false;
-      isCheckingPopup = false;
+      Navigator.of(context)
+          .push(
+        MaterialPageRoute(
+          builder: (_) => PacifierWarningScreen(
+            cameraController: widget.cameraController,
+            interpreter: widget.interpreter,
+            initialUrl: widget.initialUrl,
+          ),
+        ),
+      )
+          .then((_) {
+        isPopupOpen = false;
+        _isCapturing = true;
+
+        webViewService.controller.runJavaScript('''
+          function resumeYouTubeVideos() {
+            var iframes = document.getElementsByTagName('iframe');
+            for (var i = 0; i < iframes.length; i++) {
+              var iframe = iframes[i];
+              if (iframe.src.includes('youtube.com')) {
+                iframe.contentWindow.postMessage(
+                  '{"event":"command","func":"playVideo","args":""}',
+                  '*'
+                );
+              }
+            }
+            var videos = document.getElementsByTagName('video');
+            for (var i = 0; i < videos.length; i++) {
+              videos[i].play();
+            }
+            console.log('Vídeos retomados');
+          }
+          resumeYouTubeVideos();
+        ''').catchError((e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao retomar vídeo: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        });
+
+        _startImageCaptureLoop();
+      });
     }
   }
 

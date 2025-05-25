@@ -63,9 +63,22 @@ class AboutAppScreen extends StatelessWidget {
               'das crianças.',
               style: TextStyle(fontSize: 16),
             ),
+            SizedBox(height: 8),
+            Text(
+              'Como usar:',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '• Entre nos sites antes de dar acesso ao seu filho, para poder configurar o ambiente!\n '
+              '• Através das configurações você consegue bloquear ou permitir os sites selecionados!\n '
+              '• Se possível utilize chupetas de cores que se destaquem em sua coloração, mas sem perder o formato de'
+              'uma chupeta',
+              style: TextStyle(fontSize: 16),
+            ),
             SizedBox(height: 32),
             Text(
-              'Versão 1.0 - Projeto de Pesquisa 2025',
+              'Versão 5.7 - Projeto de Pesquisa 2025',
               style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
               textAlign: TextAlign.center,
             ),

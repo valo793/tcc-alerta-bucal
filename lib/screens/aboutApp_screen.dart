@@ -73,7 +73,8 @@ class AboutAppScreen extends StatelessWidget {
               '• Entre nos sites antes de dar acesso ao seu filho, para poder configurar o ambiente!\n '
               '• Através das configurações você consegue bloquear ou permitir os sites selecionados!\n '
               '• Se possível utilize chupetas de cores que se destaquem em sua coloração, mas sem perder o formato de'
-              'uma chupeta',
+              'uma chupeta'
+              '• Utilize chupetas simetricas horizontalmente para melhor funcionamento!',
               style: TextStyle(fontSize: 16),
             ),
             SizedBox(height: 32),

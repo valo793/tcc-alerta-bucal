@@ -25,6 +25,7 @@ class PacifierWarningScreen extends StatefulWidget {
 class _PacifierWarningScreenState extends State<PacifierWarningScreen> {
   late CameraController _cameraController;
   bool _isChecking = true;
+  bool _isProcessing = false; // Added to prevent concurrent processing
   Timer? _captureTimer;
 
   @override
@@ -34,22 +35,24 @@ class _PacifierWarningScreenState extends State<PacifierWarningScreen> {
   }
 
   Future<void> _initializeCamera() async {
-    try {
-      _cameraController = widget.cameraController;
-      if (!_cameraController.value.isInitialized) {
+    _cameraController = widget.cameraController;
+    if (!_cameraController.value.isInitialized) {
+      debugPrint("Câmera não inicializada, tentando inicializar...");
+      try {
         await _cameraController.initialize();
+      } catch (e) {
+        debugPrint('Erro ao inicializar câmera: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao inicializar câmera: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
       }
-      if (mounted) {
-        _startImageCheckLoop();
-      }
-    } catch (e) {
-      debugPrint('Erro ao inicializar câmera: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao inicializar câmera: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    }
+    if (mounted) {
+      _startImageCheckLoop();
     }
   }
 
@@ -65,21 +68,31 @@ class _PacifierWarningScreenState extends State<PacifierWarningScreen> {
   }
 
   Future<void> _checkImage() async {
-    if (!_isChecking || !mounted || !_cameraController.value.isInitialized) {
+    if (!_isChecking ||
+        !mounted ||
+        !_cameraController.value.isInitialized ||
+        _isProcessing) {
+      debugPrint(
+          "Verificação cancelada: _isChecking=$_isChecking, mounted=$mounted, cameraInitialized=${_cameraController.value.isInitialized}, isProcessing=$_isProcessing");
       return;
     }
 
+    _isProcessing = true;
     try {
+      debugPrint("Iniciando verificação de imagem...");
       final image = await _cameraController.takePicture();
+      debugPrint("Imagem capturada: ${image.path}");
       final imageBytes = await File(image.path).readAsBytes();
 
+      debugPrint("Processando imagem com Interpreter...");
       final confidence = await compute(_processImage, {
         'bytes': imageBytes,
-        'modelAddress': widget.interpreter.address,
+        'interpreter': widget.interpreter, // Pass Interpreter directly
       });
-
       debugPrint('Confiança na PacifierWarningScreen: $confidence');
+
       if (confidence < 0.8) {
+        debugPrint("Chupeta não detectada, voltando para WebViewScreen...");
         _isChecking = false;
         _captureTimer?.cancel();
         if (mounted) {
@@ -96,13 +109,15 @@ class _PacifierWarningScreenState extends State<PacifierWarningScreen> {
           ),
         );
       }
+    } finally {
+      _isProcessing = false;
     }
   }
 
   static double _processImage(Map args) {
     final Uint8List bytes = args['bytes'];
-    final int modelAddress = args['modelAddress'];
-    final interpreter = tfl.Interpreter.fromAddress(modelAddress);
+    final tfl.Interpreter interpreter =
+        args['interpreter']; // Receive Interpreter directly
     final decoded = img.decodeImage(Uint8List.fromList(bytes));
     if (decoded == null) return 0.0;
 
@@ -133,6 +148,13 @@ class _PacifierWarningScreenState extends State<PacifierWarningScreen> {
     }
 
     return maxConfidence;
+  }
+
+  @override
+  void dispose() {
+    _captureTimer?.cancel();
+    _isChecking = false;
+    super.dispose();
   }
 
   @override

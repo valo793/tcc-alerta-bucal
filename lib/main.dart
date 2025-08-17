@@ -41,7 +41,7 @@ Future<void> main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final List<CameraDescription> cameras;
   final CameraController cameraController;
   final tfl.Interpreter interpreter;
@@ -54,6 +54,40 @@ class MyApp extends StatelessWidget {
   });
 
   @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      widget.cameraController.stopImageStream();
+    } else if (state == AppLifecycleState.resumed) {
+      if (!widget.cameraController.value.isInitialized) {
+        widget.cameraController.initialize().then((_) {
+          if (mounted) {
+            widget.cameraController.startImageStream((_) {});
+          }
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.cameraController.dispose();
+    AIService.instance.dispose(); // Close Interpreter
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AlertaBucal',
@@ -63,9 +97,9 @@ class MyApp extends StatelessWidget {
         '/password': (context) => const PasswordScreen(),
         '/preferences': (context) => const PreferencesScreen(),
         '/site-selection': (context) => SiteSelectionScreen(
-              cameras: cameras,
-              cameraController: cameraController,
-              interpreter: interpreter,
+              cameras: widget.cameras,
+              cameraController: widget.cameraController,
+              interpreter: widget.interpreter,
             ),
       },
       onGenerateRoute: (settings) {
@@ -75,8 +109,8 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (context) => WebViewScreen(
                 initialUrl: args,
-                cameraController: cameraController,
-                interpreter: interpreter,
+                cameraController: widget.cameraController,
+                interpreter: widget.interpreter,
               ),
             );
           }

@@ -10,9 +10,9 @@ class PasswordService {
 
     print('Biometrias disponíveis: $biometrics');
     return canCheck &&
-            isSupported &&
-            biometrics.contains(BiometricType.fingerprint) ||
-        biometrics.contains(BiometricType.strong);
+        isSupported &&
+        (biometrics.contains(BiometricType.fingerprint) ||
+            biometrics.contains(BiometricType.strong));
   }
 
   Future<bool> authenticateWithFingerprint() async {
@@ -26,7 +26,24 @@ class PasswordService {
         ),
       );
     } catch (e) {
-      print('Erro na autenticação: $e');
+      print('Erro na autenticação biométrica: $e');
+      return false;
+    }
+  }
+
+  // 🔐 Novo método — senha/PIN do sistema
+  Future<bool> authenticateWithDeviceCredentials() async {
+    try {
+      return await _auth.authenticate(
+        localizedReason: 'Digite o PIN, padrão ou senha do dispositivo',
+        options: const AuthenticationOptions(
+          biometricOnly: false, // permite PIN ou padrão
+          stickyAuth: true,
+          useErrorDialogs: true,
+        ),
+      );
+    } catch (e) {
+      print('Erro na autenticação com credenciais: $e');
       return false;
     }
   }

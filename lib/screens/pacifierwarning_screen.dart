@@ -5,6 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
 import 'package:image/image.dart' as img;
 import 'package:flutter/foundation.dart';
+import 'package:lottie/lottie.dart';
 
 class PacifierWarningScreen extends StatefulWidget {
   final CameraController cameraController;
@@ -160,20 +161,44 @@ class _PacifierWarningScreenState extends State<PacifierWarningScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.purple[100],
+      backgroundColor: const Color.fromARGB(255, 250, 252, 250),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.warning, size: 100, color: Colors.red),
-            SizedBox(height: 20),
-            Text(
-              'Por favor, retire a chupeta para continuar.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          children: [
+            // Animação Lottie
+            SizedBox(
+              width: 250,
+              height: 250,
+              child: Lottie.asset(
+                'assets/pacifier_warning.json',
+                repeat: true, // deixa em loop
+                animate: true,
+                fit: BoxFit.contain,
+              ),
             ),
-            SizedBox(height: 30),
-            CircularProgressIndicator(),
+            const SizedBox(height: 30),
+
+            // Legenda clara
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 30.0),
+              child: Text(
+                'Por favor, tire a chupeta para continuar!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 40),
+
+            // Indicador
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.purple),
+            ),
           ],
         ),
       ),

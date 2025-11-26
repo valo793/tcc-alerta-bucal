@@ -44,6 +44,8 @@ dependencies:
   path: ^1.8.3
   tflite_flutter: ^0.11.0
   local_auth: ^2.1.6
+  lottie: ^3.1.0
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:
@@ -55,6 +57,13 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_icons:
+  android: true
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#F8FAF8"
+  adaptive_icon_foreground: "assets/logo_foreground.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -70,6 +79,7 @@ flutter:
   assets:
     - assets/logo.png
     - assets/modelo.tflite
+    - assets/pacifier_warning.json
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 

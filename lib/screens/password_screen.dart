@@ -10,39 +10,19 @@ class PasswordScreen extends StatefulWidget {
 
 class _PasswordScreenState extends State<PasswordScreen> {
   final PasswordService passwordService = PasswordService();
-  bool canUseBiometrics = false;
   bool isAuthenticating = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _checkBiometricAvailability();
-  }
-
-  Future<void> _checkBiometricAvailability() async {
-    bool available = await passwordService.isFingerprintAvailable();
-    setState(() {
-      canUseBiometrics = available;
-    });
-  }
-
-  Future<void> _authenticateBiometric() async {
-    setState(() {
-      isAuthenticating = true;
-    });
-
-    final isValid = await passwordService.authenticateWithFingerprint();
+  Future<void> _authenticate() async {
+    setState(() => isAuthenticating = true);
+    final isValid = await passwordService.authenticateWithDeviceCredentials();
 
     if (!mounted) return;
-
-    setState(() {
-      isAuthenticating = false;
-    });
+    setState(() => isAuthenticating = false);
 
     if (isValid) {
       Navigator.pushReplacementNamed(context, '/site-selection');
     } else {
-      _showErrorDialog('Falha na autenticação por impressão digital.');
+      _showErrorDialog('Falha na autenticação.');
     }
   }
 
@@ -50,12 +30,19 @@ class _PasswordScreenState extends State<PasswordScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Erro'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Erro',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: const Text(
+              'OK',
+              style: TextStyle(color: Colors.blue),
+            ),
           )
         ],
       ),
@@ -69,13 +56,11 @@ class _PasswordScreenState extends State<PasswordScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text(
-            'Autenticação',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            'Bem-vindo!',
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
           backgroundColor: Colors.blue,
+          centerTitle: true,
         ),
         body: SafeArea(
           child: Center(
@@ -83,42 +68,76 @@ class _PasswordScreenState extends State<PasswordScreen> {
               constraints: const BoxConstraints(maxWidth: 600),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: canUseBiometrics
-                    ? isAuthenticating
-                        ? const CircularProgressIndicator(
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.blue),
-                          )
-                        : ElevatedButton(
-                            onPressed: _authenticateBiometric,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 16,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Autenticar com digital',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          )
-                    : const Text(
-                        'Impressão digital não disponível ou não configurada.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.blue,
-                        ),
-                        textAlign: TextAlign.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.lock_outline,
+                        size: 90, color: Colors.blueAccent),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Autenticação Segura',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Use sua digital ou senha/PIN para continuar',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    isAuthenticating
+                        ? const CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.blueAccent),
+                          )
+                        : GestureDetector(
+                            onTap: _authenticate,
+                            child: Card(
+                              color: Colors.blueAccent,
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20)),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 32, vertical: 20),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(Icons.fingerprint,
+                                        color: Colors.white, size: 32),
+                                    SizedBox(width: 12),
+                                    Text(
+                                      'Autenticar',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                    const SizedBox(height: 40),
+                    const Text(
+                      'Seu acesso está protegido 🔒',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.black45,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

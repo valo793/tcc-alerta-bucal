@@ -9,7 +9,7 @@
     <application
         android:hardwareAccelerated="true"
         android:usesCleartextTraffic="true"
-        android:label="tcc_alertabucal"
+        android:label="Alerta Bucal"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

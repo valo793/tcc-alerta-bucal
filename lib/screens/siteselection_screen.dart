@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:camera/camera.dart';
 import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
+import 'package:google_fonts/google_fonts.dart';
 import '../services/password_service.dart';
 import '../services/preferences_model.dart';
 import 'aboutApp_screen.dart';
@@ -36,17 +37,18 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
   };
 
   @override
-  void initState() {
-    super.initState();
-    _loadPreferences();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isLoadingPreferences) {
+      _loadPreferences();
+    }
   }
 
   Future<void> _loadPreferences() async {
     final preferences = Provider.of<PreferencesModel>(context, listen: false);
     await preferences.reloadPreferences();
-    setState(() {
-      _isLoadingPreferences = false;
-    });
+    if (!mounted) return; // ✅ adicional de segurança
+    setState(() => _isLoadingPreferences = false);
   }
 
   Future<void> navigateToWebView(String url) async {
@@ -57,6 +59,7 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
       final preferences = Provider.of<PreferencesModel>(context, listen: false);
       bool isBlocked = _checkIfBlocked(url, preferences);
       if (!isBlocked) {
+        if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -89,13 +92,16 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Acesso Bloqueado'),
-        content:
-            const Text('Este site está bloqueado pelas suas preferências.'),
+        title: Text('Acesso Bloqueado',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+        content: Text('Este site está bloqueado pelas suas preferências.',
+            style: GoogleFonts.nunito()),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK', style: TextStyle(color: Colors.blue)),
+            child: Text('OK',
+                style: GoogleFonts.nunito(
+                    color: Colors.blue, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -111,42 +117,37 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
         return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Autenticação'),
+          title: Text('Autenticação',
+              style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.fingerprint, size: 48, color: Colors.blue),
-              SizedBox(height: 16),
+            children: [
+              const Icon(Icons.lock, size: 48, color: Colors.blue),
+              const SizedBox(height: 16),
               Text(
-                'Toque no sensor de impressão digital para acessar as preferências.',
+                'Use sua digital ou senha/PIN para acessar as preferências.',
                 textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(),
               ),
             ],
           ),
           actions: <Widget>[
             TextButton(
-              child:
-                  const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+              child: Text('Cancelar',
+                  style: GoogleFonts.nunito(
+                      color: Colors.grey, fontWeight: FontWeight.bold)),
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child:
-                  const Text('Confirmar', style: TextStyle(color: Colors.blue)),
+              child: Text('Autenticar',
+                  style: GoogleFonts.nunito(
+                      color: Colors.blue, fontWeight: FontWeight.bold)),
               onPressed: () async {
                 bool isValid =
-                    await _passwordService!.authenticateWithFingerprint();
+                    await _passwordService!.authenticateWithDeviceCredentials();
+                if (!mounted) return;
                 Navigator.of(context).pop();
-                if (isValid) {
-                  Navigator.pushNamed(context, '/preferences');
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Falha na autenticação.'),
-                      backgroundColor: Colors.red,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }
+                _handleAuthResult(isValid);
               },
             ),
           ],
@@ -155,11 +156,26 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
     );
   }
 
+  void _handleAuthResult(bool isValid) {
+    if (isValid) {
+      Navigator.pushNamed(context, '/preferences');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Falha na autenticação.', style: GoogleFonts.nunito()),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Selecione um Site'),
+        title: Text('Escolha sua Atividade!',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -186,45 +202,55 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
                   constraints: const BoxConstraints(maxWidth: 600),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: ListView(
+                    child: Column(
                       children: [
-                        const Text(
-                          'Escolha um site para acessar:',
-                          style: TextStyle(
-                            fontSize: 24,
+                        Text(
+                          'Onde vamos hoje?',
+                          style: GoogleFonts.nunito(
+                            fontSize: 28,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue,
+                            color: Colors.blue[800],
                           ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
-                        _buildSiteButton(
-                          context,
-                          title: 'YouTube',
-                          icon: Icons.video_library,
-                          url: 'https://m.youtube.com/?vq=medium',
-                        ),
-                        const SizedBox(height: 12),
-                        _buildSiteButton(
-                          context,
-                          title: 'Pluto TV',
-                          icon: Icons.live_tv,
-                          url:
-                              'https://pluto.tv/br/live-tv/6479ff764f5ba500087ascan:play',
-                        ),
-                        const SizedBox(height: 12),
-                        _buildSiteButton(
-                          context,
-                          title: 'Khan Academy',
-                          icon: Icons.school,
-                          url: 'https://pt.khanacademy.org',
-                        ),
-                        const SizedBox(height: 12),
-                        _buildSiteButton(
-                          context,
-                          title: 'Escola Games',
-                          icon: Icons.games,
-                          url: 'https://www.escolagames.com.br',
+                        Expanded(
+                          child: GridView.count(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                            children: [
+                              _buildSiteButton(
+                                context,
+                                title: 'YouTube',
+                                icon: Icons.video_library,
+                                url: 'https://m.youtube.com/?vq=medium',
+                                color: Colors.red.shade400,
+                              ),
+                              _buildSiteButton(
+                                context,
+                                title: 'Pluto TV',
+                                icon: Icons.live_tv,
+                                url:
+                                    'https://pluto.tv/br/live-tv/6479ff764f5ba500087ascan:play',
+                                color: Colors.indigo.shade400,
+                              ),
+                              _buildSiteButton(
+                                context,
+                                title: 'Khan Academy',
+                                icon: Icons.school,
+                                url: 'https://pt.khanacademy.org',
+                                color: Colors.green.shade400,
+                              ),
+                              _buildSiteButton(
+                                context,
+                                title: 'Escola Games',
+                                icon: Icons.games,
+                                url: 'https://www.escolagames.com.br',
+                                color: Colors.orange.shade400,
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -240,29 +266,31 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
     required String title,
     required IconData icon,
     required String url,
+    required Color color,
   }) {
     return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
+      color: color,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         onTap: () => navigateToWebView(url),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 24, color: Colors.blue),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+              Icon(icon, size: 60, color: Colors.white),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
             ],
           ),
         ),
@@ -271,6 +299,7 @@ class _SiteSelectionScreenState extends State<SiteSelectionScreen> {
   }
 }
 
+// extensão igual
 extension PreferencesModelExtension on PreferencesModel {
   dynamic getProperty(String property) {
     switch (property) {

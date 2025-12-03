@@ -39,6 +39,8 @@ class _WebViewScreenState extends State<WebViewScreen>
 
   static const platform = MethodChannel("com.example.webview/audio");
 
+  Uint8List? _lastCapturedImage; // última imagem capturada
+
   @override
   void initState() {
     super.initState();
@@ -109,6 +111,13 @@ class _WebViewScreenState extends State<WebViewScreen>
     try {
       final image = await widget.cameraController.takePicture();
       final imageBytes = await File(image.path).readAsBytes();
+
+      // guarda a última foto para exibir no app
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _lastCapturedImage = imageBytes;
+        });
+      }
 
       // Processamento pesado (resize e normalização) em isolate
       final input = await compute(_preprocessImage, imageBytes);
@@ -244,6 +253,25 @@ class _WebViewScreenState extends State<WebViewScreen>
       body: Stack(
         children: [
           WebViewWidget(controller: webViewService.controller),
+
+          // miniatura da última imagem capturada
+          if (_lastCapturedImage != null)
+            Positioned(
+              bottom: 16,
+              left: 16,
+              child: SizedBox(
+                width: 120,
+                height: 120,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(
+                    _lastCapturedImage!,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
+
           if (isLoading)
             const Center(
               child: CircularProgressIndicator(color: Colors.blue),
